@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>QR Attendance Tracker</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+
+* {
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    margin: 0;
+    background: #f4f4f4;
+}
+
+header {
+    background: #222;
+    color: white;
+    padding: 18px;
+    text-align: center;
+}
+
+.container {
+    max-width: 1000px;
+    margin: 25px auto;
+    padding: 15px;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+input, button {
+    width: 100%;
+    padding: 12px;
+    margin: 6px 0;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+button {
+    background: #222;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #444;
+}
+
+.logout {
+    background: #b00020;
+}
+
+.hidden {
+    display: none;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: center;
+}
+
+th {
+    background: #222;
+    color: white;
+}
+
+.student-box {
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin-top: 10px;
+    border-radius: 8px;
+}
+
+.qr {
+    margin: 10px auto;
+    width: 128px;
+}
+
+.present {
+    color: green;
+    font-weight: bold;
+}
+
+.absent {
+    color: red;
+    font-weight: bold;
+}
+
+.summary {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.summary-box {
+    flex: 1;
+    border: 1px solid #ddd;
+    padding: 15px;
+    text-align: center;
+    border-radius: 8px;
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>QR Code Attendance Tracker</h1>
+</header>
+
+<div class="container">
+
+<!-- LOGIN -->
+
+<div id="loginPage" class="card">
+
+    <h2>Admin Login</h2>
+
+    <input type="text" id="username" placeholder="Admin Username">
+
+    <input type="password" id="password" placeholder="Admin Password">
+
+    <button onclick="login()">Login</button>
+
+    <p id="loginMessage"></p>
+
+</div>
+
+
+<!-- ADMIN DASHBOARD -->
+
+<div id="dashboard" class="hidden">
+
+    <div class="card">
+
+        <h2>Admin Dashboard</h2>
+
+        <p>
+            Logged in as:
+            <b id="currentAdmin"></b>
+        </p>
+
+        <button class="logout" onclick="logout()">
+            Logout
+        </button>
+
+    </div>
+
+
+    <!-- ADD STUDENT -->
+
+    <div class="card">
+
+        <h2>Add Student</h2>
+
+        <input
+            type="text"
+            id="studentName"
+            placeholder="Student Name"
+        >
+
+        <input
+            type="text"
+            id="studentID"
+            placeholder="Student ID"
+        >
+
+        <button onclick="addStudent()">
+            Add Student & Generate QR
+        </button>
+
+        <div id="studentList"></div>
+
+    </div>
+
+
+    <!-- QR SCANNER -->
+
+    <div class="card">
+
+        <h2>Scan Student QR Code</h2>
+
+        <div id="reader" style="width:100%;"></div>
+
+        <p id="scanResult"></p>
+
+    </div>
+
+
+    <!-- ATTENDANCE -->
+
+    <div class="card">
+
+        <h2>Today's Attendance</h2>
+
+        <p>
+            Date:
+            <b id="todayDate"></b>
+        </p>
+
+
+        <!-- SUMMARY -->
+
+        <div class="summary">
+
+            <div class="summary-box">
+
+                <b>Total Students</b>
+
+                <h2 id="totalStudents">
+                    0
+                </h2>
+
+            </div>
+
+
+            <div class="summary-box">
+
+                <b>Present</b>
+
+                <h2
+                    id="presentCount"
+                    class="present"
+                >
+                    0
+                </h2>
+
+            </div>
+
+
+            <div class="summary-box">
+
+                <b>Absent</b>
+
+                <h2
+                    id="absentCount"
+                    class="absent"
+                >
+                    0
+                </h2>
+
+            </div>
+
+        </div>
+
+
+        <button onclick="clearAttendance()">
+            Clear Today's Attendance
+        </button>
+
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                    <th>Student Name</th>
+
+                    <th>Student ID</th>
+
+                    <th>Date</th>
+
+                    <th>Time</th>
+
+                    <th>Status</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody id="attendanceTable"></tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+</div>
+
+
+<script>
+
+
+// ==========================
+// ADMIN ACCOUNTS
+// ==========================
+
+const admins = [
+
+    {
+        username: "admin1",
+        password: "Admin123"
+    },
+
+    {
+        username: "admin2",
+        password: "Admin456"
+    },
+
+    {
+        username: "admin3",
+        password: "Admin789"
+    },
+
+    {
+        username: "admin4",
+        password: "Admin000"
+    }
+
+];
+
+
+// ==========================
+// DATA
+// ==========================
+
+let students =
+    JSON.parse(localStorage.getItem("students")) || [];
+
+let attendance =
+    JSON.parse(localStorage.getItem("attendance")) || [];
+
+
+// ==========================
+// LOGIN
+// ==========================
+
+function login() {
+
+    const username =
+        document.getElementById("username").value.trim();
+
+    const password =
+        document.getElementById("password").value;
+
+    const admin = admins.find(
+        a =>
+            a.username === username &&
+            a.password === password
+    );
+
+
+    if (admin) {
+
+        document
+            .getElementById("loginPage")
+            .classList.add("hidden");
+
+        document
+            .getElementById("dashboard")
+            .classList.remove("hidden");
+
+        document
+            .getElementById("currentAdmin")
+            .textContent = admin.username;
+
+        document
+            .getElementById("loginMessage")
+            .textContent = "";
+
+        showTodayDate();
+
+        displayStudents();
+
+        displayAttendance();
+
+        startScanner();
+
+    }
+
+    else {
+
+        document
+            .getElementById("loginMessage")
+            .textContent =
+            "Incorrect username or password.";
+
+    }
+
+}
+
+
+// ==========================
+// LOGOUT
+// ==========================
+
+function logout() {
+
+    document
+        .getElementById("dashboard")
+        .classList.add("hidden");
+
+    document
+        .getElementById("loginPage")
+        .classList.remove("hidden");
+
+    document
+        .getElementById("username")
+        .value = "";
+
+    document
+        .getElementById("password")
+        .value = "";
+
+    document
+        .getElementById("currentAdmin")
+        .textContent = "";
+
+}
+
+
+// ==========================
+// TODAY'S DATE
+// ==========================
+
+function getToday() {
+
+    const now = new Date();
+
+    return now.toLocaleDateString();
+
+}
+
+
+function showTodayDate() {
+
+    document
+        .getElementById("todayDate")
+        .textContent = getToday();
+
+}
+
+
+// ==========================
+// ADD STUDENT
+// ==========================
+
+function addStudent() {
+
+    const name =
+        document
+            .getElementById("studentName")
+            .value
+            .trim();
+
+    const id =
+        document
+            .getElementById("studentID")
+            .value
+            .trim();
+
+
+    if (!name || !id) {
+
+        alert(
+            "Please enter the student name and ID."
+        );
+
+        return;
+
+    }
+
+
+    const existing =
+        students.find(
+            student => student.id === id
+        );
+
+
+    if (existing) {
+
+        alert(
+            "This Student ID already exists."
+        );
+
+        return;
+
+    }
+
+
+    students.push({
+
+        name: name,
+        id: id
+
+    });
+
+
+    localStorage.setItem(
+        "students",
+        JSON.stringify(students)
+    );
+
+
+    document
+        .getElementById("studentName")
+        .value = "";
+
+    document
+        .getElementById("studentID")
+        .value = "";
+
+
+    displayStudents();
+
+    displayAttendance();
+
+}
+
+
+// ==========================
+// DISPLAY STUDENTS
+// ==========================
+
+function displayStudents() {
+
+    const list =
+        document.getElementById("studentList");
+
+    list.innerHTML = "";
+
+
+    students.forEach(student => {
+
+        const box =
+            document.createElement("div");
+
+        box.className = "student-box";
+
+
+        box.innerHTML = `
+
+            <h3>${student.name}</h3>
+
+            <p>
+                Student ID:
+                <b>${student.id}</b>
+            </p>
+
+            <div
+                class="qr"
+                id="qr-${student.id}"
+            ></div>
+
+        `;
+
+
+        list.appendChild(box);
+
+
+        new QRCode(
+
+            document.getElementById(
+                "qr-" + student.id
+            ),
+
+            {
+
+                text: student.id,
+
+                width: 128,
+
+                height: 128
+
+            }
+
+        );
+
+    });
+
+}
+
+
+// ==========================
+// QR SCANNER
+// ==========================
+
+let scanner;
+
+
+function startScanner() {
+
+    if (scanner) return;
+
+
+    scanner =
+        new Html5Qrcode("reader");
+
+
+    scanner.start(
+
+        { facingMode: "environment" },
+
+        {
+
+            fps: 10,
+
+            qrbox: 250
+
+        },
+
+
+        function(decodedText) {
+
+            recordAttendance(decodedText);
+
+        },
+
+
+        function(errorMessage) {
+
+            // Ignore scanning errors
+
+        }
+
+    )
+
+    .catch(function(error) {
+
+        document
+            .getElementById("scanResult")
+            .textContent =
+            "Camera could not be started. Please allow camera permission.";
+
+    });
+
+}
+
+
+// ==========================
+// RECORD ATTENDANCE
+// ==========================
+
+function recordAttendance(studentID) {
+
+    const student =
+        students.find(
+            s => s.id === studentID
+        );
+
+
+    if (!student) {
+
+        document
+            .getElementById("scanResult")
+            .textContent =
+            "Student ID not found.";
+
+        return;
+
+    }
+
+
+    const now = new Date();
+
+
+    const date =
+        now.toLocaleDateString();
+
+
+    const time =
+        now.toLocaleTimeString();
+
+
+    const alreadyPresent =
+        attendance.some(
+
+            a =>
+                a.id === studentID &&
+                a.date === date
+
+        );
+
+
+    if (alreadyPresent) {
+
+        document
+            .getElementById("scanResult")
+            .textContent =
+            student.name +
+            " is already marked Present today.";
+
+        return;
+
+    }
+
+
+    attendance.push({
+
+        name: student.name,
+
+        id: student.id,
+
+        date: date,
+
+        time: time,
+
+        status: "Present"
+
+    });
+
+
+    localStorage.setItem(
+
+        "attendance",
+
+        JSON.stringify(attendance)
+
+    );
+
+
+    document
+        .getElementById("scanResult")
+        .textContent =
+        student.name +
+        " successfully marked Present.";
+
+
+    displayAttendance();
+
+}
+
+
+// ==========================
+// DISPLAY ATTENDANCE
+// ==========================
+
+function displayAttendance() {
+
+    const table =
+        document.getElementById(
+            "attendanceTable"
+        );
+
+
+    table.innerHTML = "";
+
+
+    const today =
+        getToday();
+
+
+    let present = 0;
+
+    let absent = 0;
+
+
+    // ==========================
+    // SHOW EVERY STUDENT
+    // ==========================
+
+    students.forEach(student => {
+
+
+        const record =
+            attendance.find(
+
+                a =>
+                    a.id === student.id &&
+                    a.date === today
+
+            );
+
+
+        const row =
+            document.createElement("tr");
+
+
+        if (record) {
+
+            // STUDENT IS PRESENT
+
+            row.innerHTML = `
+
+                <td>${student.name}</td>
+
+                <td>${student.id}</td>
+
+                <td>${today}</td>
+
+                <td>${record.time}</td>
+
+                <td class="present">
+                    Present
+                </td>
+
+            `;
+
+
+            present++;
+
+        }
+
+        else {
+
+            // STUDENT DID NOT SCAN
+
+            row.innerHTML = `
+
+                <td>${student.name}</td>
+
+                <td>${student.id}</td>
+
+                <td>${today}</td>
+
+                <td>—</td>
+
+                <td class="absent">
+                    Absent
+                </td>
+
+            `;
+
+
+            absent++;
+
+        }
+
+
+        table.appendChild(row);
+
+    });
+
+
+    // ==========================
+    // UPDATE SUMMARY
+    // ==========================
+
+    document
+        .getElementById("totalStudents")
+        .textContent =
+        students.length;
+
+
+    document
+        .getElementById("presentCount")
+        .textContent =
+        present;
+
+
+    document
+        .getElementById("absentCount")
+        .textContent =
+        absent;
+
+}
+
+
+// ==========================
+// CLEAR TODAY'S ATTENDANCE
+// ==========================
+
+function clearAttendance() {
+
+    const today =
+        getToday();
+
+
+    if (
+        confirm(
+            "Are you sure you want to clear today's attendance?"
+        )
+    ) {
+
+        attendance =
+            attendance.filter(
+                record =>
+                    record.date !== today
+            );
+
+
+        localStorage.setItem(
+
+            "attendance",
+
+            JSON.stringify(attendance)
+
+        );
+
+
+        displayAttendance();
+
+    }
+
+}
+
+</script>
+
+</body>
+</html>
